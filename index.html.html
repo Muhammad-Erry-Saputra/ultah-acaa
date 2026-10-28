@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selamat Ulang Tahun Acaa 🎂</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<canvas id="fx"></canvas>
+<div id="field"></div>
+<div id="balloons"></div>
+<div id="dots"></div>
+<button id="musicBtn" title="Putar lagu">🎵</button>
+
+<main id="stage">
+
+  <!-- 0: Intro -->
+  <section class="scene active" id="s0">
+    <div class="moon">🌙</div>
+    <div id="introA"></div>
+    <div id="introB"></div>
+    <button class="btn hidden" id="startBtn">Mulai✨</button>
+  </section>
+
+  <!-- 1: Tangkap hati -->
+  <section class="scene" id="s1">
+    <h1>Tangkep dong 10 love 💗</h1>
+    <p class="sub">Klik atau sentuh love yang jatuh sebelum hilang!</p>
+    <div class="meter"><div id="meterFill"></div></div>
+    <div id="score">0 / 10</div>
+  </section>
+
+  <!-- 2: Nyalakan & tiup lilin -->
+  <section class="scene" id="s2">
+    <h1>Nyalain lilinnya 🕯️</h1>
+    <p class="sub">Seret 🔥 ke sumbu lilin sampai menyala</p>
+    <div class="cake">
+      <div class="candles" id="candles">
+        <div class="candle"><div class="flame"></div></div>
+        <div class="candle"><div class="flame"></div></div>
+        <div class="candle"><div class="flame"></div></div>
+      </div>
+      <div class="layer l2"></div>
+      <div class="layer l1"></div>
+      <div class="plate"></div>
+    </div>
+    <div class="matchZone" id="matchZone"><div id="match">🔥</div></div>
+    <div id="blowRow" class="hidden">
+      <button class="btn" id="blowBtn">Tiup semua 💨</button>
+      <button class="btn alt" id="micBtn">Tiup lewat mikrofon 🎤</button>
+    </div>
+    <p class="hint" id="hint">0 / 3 lilin menyala</p>
+  </section>
+
+  <!-- 3: Kartu gosok -->
+  <section class="scene" id="s3">
+    <h1>Gosok coba 🎟️</h1>
+    <p class="sub">Gosok pakai jari atau mouse buat liat isinya</p>
+    <div class="scratchWrap">
+      <div class="reveal" id="revealText"></div>
+      <canvas id="scratch" width="320" height="190"></canvas>
+    </div>
+    <p class="hint" id="scratchPct"></p>
+    <button class="btn hidden" id="next3">Lanjut aja deh 🎁</button>
+  </section>
+
+  <!-- 4: Pilih kado -->
+  <section class="scene" id="s4">
+    <h1>Buka dong kadonya 🎁</h1>
+    <p class="sub">Klik kado untuk membukanya (<span id="giftCount">0</span> / 3)</p>
+    <div class="gifts">
+      <div class="g">🎁</div><div class="g">🎁</div><div class="g">🎁</div>
+    </div>
+    <div id="wishes"></div>
+    <button class="btn hidden" id="next4">Buka ucapan spesial 💌</button>
+  </section>
+
+  <!-- 5: Ucapan akhir -->
+  <section class="scene" id="s5">
+    <div class="card">
+      <h1 class="grad" id="finalTitle"></h1>
+      <div id="typed"></div>
+      <p class="from" id="fromText"></p>
+      <p class="tip">💡 Klik di mana saja untuk meluncurkan kembang api, dan letuskan balonnya!</p>
+      <button class="btn" id="fireBtn">Kembang api 🎆</button>
+      <button class="btn alt" id="loveBtn">Kirim cinta 💌</button>
+      <button class="btn alt" id="replayBtn">Ulangi 🔁</button>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =====================================================
+   ✏️ UBAH BAGIAN INI SESUAI KEINGINANMU
+   ===================================================== */
+const CONFIG = {
+  name: "Marsha Regita Ramadhani, S.H",
+  from: "Dari: orang Bandung",      // kosongkan "" kalau tidak mau
+  title: "Selamat Ulang Tahun, {nama}! 🎂",
+  scratch: "CIE UDAH 22 AJA💖",
+  wishes: [
+    "Semoga kamu disana sehat selalu ✨",
+    "Semoga semua mimpi kamu satu per satu jadi nyata 🌸",
+    "Semoga tahun ini penuh tawa dan kejutan manis 🧸"
+  ],
+  giftEmoji: ["✨", "🌸", "🧸"],
+  messages: [
+    "Hai Marsha, hari ini hari spesial kamu yakan, aku ikut bahagia. Semoga di",
+    "tahun ini dan di umur 22 Tahun ini kamu bisa jadi pribadi yang lebih baik",
+    "ke depannya yaa caa, Makasih caa udah jadi orang yang baik sama",
+    "ngasih banyak cerita di hidup aku, banyak yang aku gatau jadi tau karna",
+    "kamu kaya awal kuliah aku di bantu banget sampe tugas' sama kamu",
+    "padahal kamu lagi sibuk skripsian tapi masih bisa bantu aku tiap malem.",
+    "Semoga panjang umur, sehat selalu, dan semua yang kamu harapkan",
+    "datang tepat pada waktunya. Kamu pantes banget dapet semua hal indah di dunia ini. WISH U ALL THE BEST CAAAAAAA🤍"
+  ]
+};
+
+/* ============== Util ============== */
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const rand = (a, b) => a + Math.random() * (b - a);
+const userName = CONFIG.name;
+const fill = (t) => t.replaceAll("{nama}", userName);
+let W = innerWidth, H = innerHeight;
+
+/* ============== Suara ============== */
+let ac = null;
+function audio() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === "suspended") ac.resume();
+  return ac;
+}
+function tone(f, d = .15, type = "sine", vol = .15, when = 0) {
+  try {
+    const a = audio(), t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + .02);
+  } catch (e) {}
+}
+const sfx = {
+  catch: () => tone(rand(800, 1300), .12, "triangle"),
+  light: () => { tone(660, .2); tone(990, .25, "sine", .1, .08); },
+  pop:   () => tone(180, .1, "square", .08),
+  win:   () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .25, "triangle", .14, i * .1)),
+  boom:  () => tone(90, .35, "sawtooth", .08)
+};
+
+/* ============== Latar bintang (ikut gerak kursor) ============== */
+const st = $("stars"), sc = st.getContext("2d");
+let stars = [], mx = 0, my = 0;
+function resize() {
+  W = innerWidth; H = innerHeight;
+  st.width = fx.width = W; st.height = fx.height = H;
+}
+const fx = $("fx"), cx = fx.getContext("2d");
+addEventListener("resize", resize);
+resize();
+stars = Array.from({ length: 150 }, () => ({ x: Math.random(), y: Math.random(), r: rand(.3, 1.8), p: rand(0, 6.28), d: rand(.2, 1) }));
+addEventListener("pointermove", (e) => { mx = e.clientX / W - .5; my = e.clientY / H - .5; });
+(function drawStars(t) {
+  sc.clearRect(0, 0, W, H); sc.fillStyle = "#fff";
+  for (const s of stars) {
+    sc.globalAlpha = .35 + .65 * Math.abs(Math.sin(t / 900 + s.p));
+    sc.beginPath(); sc.arc(s.x * W - mx * 50 * s.d, s.y * H - my * 50 * s.d, s.r, 0, 6.283); sc.fill();
+  }
+  requestAnimationFrame(drawStars);
+})(0);
+
+/* ============== Efek: konfeti, percikan, kembang api ============== */
+let parts = [], rockets = [];
+const COLORS = ["#ff6fae", "#ffd23f", "#7dd3fc", "#a78bfa", "#86efac", "#fb923c", "#ffffff"];
+const mk = (o) => (o.max = o.life, o);
+
+function burst(x, y, n = 100) {
+  for (let i = 0; i < n; i++) parts.push(mk({
+    k: "c", x, y, vx: rand(-6.5, 6.5), vy: rand(-13, -3), g: .25, s: rand(4, 11),
+    c: COLORS[(Math.random() * COLORS.length) | 0], r: rand(0, 6.28), vr: rand(-.2, .2), life: 220
+  }));
+}
+function confettiRain(ms = 4000) {
+  const t = setInterval(() => {
+    for (let i = 0; i < 6; i++) parts.push(mk({
+      k: "c", x: rand(0, W), y: -10, vx: rand(-1.5, 1.5), vy: rand(2, 5), g: .02, s: rand(4, 11),
+      c: COLORS[(Math.random() * COLORS.length) | 0], r: rand(0, 6.28), vr: rand(-.15, .15), life: 400
+    }));
+  }, 60);
+  setTimeout(() => clearInterval(t), ms);
+}
+function explode(x, y) {
+  const hue = rand(0, 360); sfx.boom();
+  for (let i = 0; i < 90; i++) {
+    const a = rand(0, 6.283), sp = rand(1.5, 7.5);
+    parts.push(mk({ k: "s", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: .06, s: 2.6, c: `hsl(${hue + rand(0, 50)},100%,65%)`, life: rand(70, 100) }));
+  }
+}
+function launchFirework(x, y) { rockets.push({ x, y: H, ty: y, vy: -rand(11, 15) }); }
+
+(function tick() {
+  cx.clearRect(0, 0, W, H);
+  for (const r of rockets) {
+    r.y += r.vy;
+    parts.push(mk({ k: "s", x: r.x, y: r.y, vx: rand(-.3, .3), vy: rand(.5, 1.5), g: .02, s: 2, c: "#ffd9a0", life: 18 }));
+    if (r.y <= r.ty) { explode(r.x, r.y); r.done = true; }
+  }
+  rockets = rockets.filter(r => !r.done);
+  parts = parts.filter(p => p.life > 0 && p.y < H + 30);
+  for (const p of parts) {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life--;
+    if (p.k === "c") {
+      p.r += p.vr; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r);
+      cx.globalAlpha = 1; cx.fillStyle = p.c; cx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s / 1.6); cx.restore();
+    } else {
+      p.vx *= .985; cx.globalAlpha = Math.max(0, p.life / p.max);
+      cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.s, 0, 6.283); cx.fill();
+    }
+  }
+  cx.globalAlpha = 1;
+  requestAnimationFrame(tick);
+})();
+
+// Jejak kilau mengikuti kursor / jari
+let lastT = 0;
+addEventListener("pointermove", (e) => {
+  const now = performance.now(); if (now - lastT < 28) return; lastT = now;
+  parts.push(mk({ k: "s", x: e.clientX, y: e.clientY, vx: rand(-.6, .6), vy: rand(-.2, 1), g: .03, s: rand(1.5, 3.5), c: `hsl(${rand(300, 360)},100%,78%)`, life: 28 }));
+});
+
+/* ============== Hati ============== */
+function heart(x, y) {
+  const h = document.createElement("div");
+  h.className = "heart"; h.textContent = ["💖", "💕", "💗", "💝", "🌸"][(Math.random() * 5) | 0];
+  h.style.left = x + "px"; h.style.top = y + "px";
+  document.body.appendChild(h); setTimeout(() => h.remove(), 1600);
+}
+function heartShower() { for (let i = 0; i < 20; i++) setTimeout(() => heart(rand(0, W), H * rand(.45, .9)), i * 90); }
+
+/* ============== Balon ============== */
+const BALLOON_COLORS = ["#ff6fae", "#ffb347", "#7dd3fc", "#a78bfa", "#86efac", "#f87171"];
+function spawnBalloon() {
+  if (scene !== 5) return;
+  const wrap = $("balloons"); if (wrap.children.length > 9) return;
+  const b = document.createElement("div");
+  b.className = "balloon"; b.style.left = rand(0, 92) + "%";
+  b.style.background = BALLOON_COLORS[(Math.random() * BALLOON_COLORS.length) | 0];
+  b.style.animationDuration = rand(9, 16) + "s"; b.style.setProperty("--sway", rand(-40, 40) + "px");
+  b.addEventListener("pointerdown", (e) => { e.stopPropagation(); burst(e.clientX, e.clientY, 30); sfx.pop(); b.remove(); });
+  b.addEventListener("animationend", () => b.remove());
+  wrap.appendChild(b);
+}
+setInterval(spawnBalloon, 1500);
+
+/* ============== Lagu Happy Birthday ============== */
+const TEMPO = 0.45;
+const SONG = [
+  [392.00,.75],[392.00,.25],[440.00,1],[392.00,1],[523.25,1],[493.88,2],
+  [392.00,.75],[392.00,.25],[440.00,1],[392.00,1],[587.33,1],[523.25,2],
+  [392.00,.75],[392.00,.25],[783.99,1],[659.25,1],[523.25,1],[493.88,1],[440.00,1],
+  [698.46,.75],[698.46,.25],[659.25,1],[523.25,1],[587.33,1],[523.25,2]
+];
+let songTimer = null;
+function playSong() {
+  const a = audio(); let t = a.currentTime + .1;
+  for (const [f, d] of SONG) {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = "triangle"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.18, t + .03); g.gain.exponentialRampToValueAtTime(.001, t + d * TEMPO);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + d * TEMPO + .05); t += d * TEMPO;
+  }
+  $("musicBtn").textContent = "🎶";
+  clearTimeout(songTimer); songTimer = setTimeout(() => { $("musicBtn").textContent = "🎵"; }, (t - a.currentTime) * 1000);
+}
+$("musicBtn").addEventListener("click", playSong);
+
+/* ============== Pengatur layar ============== */
+let scene = 0;
+const hooks = {};
+const TOTAL = 6;
+$("dots").innerHTML = "<i></i>".repeat(TOTAL);
+function updateDots() {
+  [...$("dots").children].forEach((d, i) => { d.className = i < scene ? "done" : i === scene ? "now" : ""; });
+}
+function go(n) {
+  scene = n;
+  document.querySelectorAll(".scene").forEach((s, i) => s.classList.toggle("active", i === n));
+  updateDots();
+  if (hooks[n]) hooks[n]();
+}
+
+/* ---------- 0: Intro ---------- */
+let introRun = 0;
+async function typeInto(el, text, speed, run) {
+  el.textContent = "";
+  for (const ch of text) { if (run !== introRun) return false; el.textContent += ch; await sleep(speed); }
+  return true;
+}
+hooks[0] = async () => {
+  const run = ++introRun;
+  $("startBtn").classList.add("hidden");
+  if (!(await typeInto($("introA"), `Hai, ${userName}... 👀`, 70, run))) return;
+  await sleep(300);
+  if (!(await typeInto($("introB"), "Main mini game bareng aku yu.", 35, run))) return;
+  $("startBtn").classList.remove("hidden");
+};
+$("startBtn").addEventListener("click", () => { audio(); sfx.win(); go(1); });
+
+/* ---------- 1: Tangkap hati ---------- */
+const GOAL = 10;
+let hearts = 0, heartTimer = null;
+function updateMeter() {
+  $("meterFill").style.width = (hearts / GOAL * 100) + "%";
+  $("score").textContent = hearts >= GOAL ? "Berhasil! 🎉" : `${hearts} / ${GOAL}`;
+}
+function spawnHeart() {
+  if (scene !== 1) return;
+  const h = document.createElement("div");
+  h.className = "fall"; h.textContent = ["💖", "💗", "💕", "💝", "🌸"][(Math.random() * 5) | 0];
+  h.style.left = rand(4, 86) + "%";
+  h.style.animationDuration = rand(3.6, 6) + "s";
+  h.style.setProperty("--rot", rand(-40, 40) + "deg");
+  h.addEventListener("pointerdown", (e) => {
+    if (h.dataset.done) return; h.dataset.done = 1;
+    hearts++; sfx.catch(); burst(e.clientX, e.clientY, 16); h.remove(); updateMeter();
+    if (hearts >= GOAL) finishHearts();
+  });
+  h.addEventListener("animationend", () => h.remove());
+  $("field").appendChild(h);
+}
+function finishHearts() {
+  clearInterval(heartTimer);
+  document.querySelectorAll(".fall").forEach(e => e.remove());
+  sfx.win(); burst(W / 2, H / 2, 150);
+  setTimeout(() => go(2), 1400);
+}
+hooks[1] = () => {
+  hearts = 0; updateMeter();
+  clearInterval(heartTimer); heartTimer = setInterval(spawnHeart, 600);
+  spawnHeart();
+};
+
+/* ---------- 2: Nyalakan & tiup lilin ---------- */
+const candles = [...document.querySelectorAll(".candle")];
+let lit = 0, blown = false;
+
+function lightCandle(c) {
+  if (c.classList.contains("lit")) return;
+  c.classList.add("lit"); lit++; sfx.light();
+  const r = c.getBoundingClientRect(); burst(r.left + 6, r.top, 14);
+  if (lit === candles.length) {
+    $("matchZone").classList.add("hidden");
+    $("blowRow").classList.remove("hidden");
+    $("hint").textContent = "Make a wish... terus tiup lilinnya! 🌬️ (boleh kok klik apinya juga)";
+  } else {
+    $("hint").textContent = `${lit} / ${candles.length} lilin menyala`;
+  }
+}
+
+// Seret korek api
+const match = $("match"); let drag = null;
+match.addEventListener("pointerdown", (e) => {
+  audio(); match.setPointerCapture(e.pointerId);
+  drag = { sx: e.clientX, sy: e.clientY }; match.classList.add("dragging");
+});
+match.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  match.style.transform = `translate(${e.clientX - drag.sx}px, ${e.clientY - drag.sy}px) scale(1.15)`;
+  const m = match.getBoundingClientRect(), mcx = m.left + m.width / 2, mcy = m.top + m.height / 2;
+  candles.forEach((c) => {
+    if (c.classList.contains("lit")) return;
+    const r = c.getBoundingClientRect();
+    if (Math.hypot(mcx - (r.left + r.width / 2), mcy - (r.top - 6)) < 52) lightCandle(c);
+  });
+});
+const endDrag = () => { drag = null; match.classList.remove("dragging"); match.style.transform = ""; };
+match.addEventListener("pointerup", endDrag);
+match.addEventListener("pointercancel", endDrag);
+
+function checkAllOut() {
+  if (blown || !candles.every(c => c.classList.contains("out"))) return;
+  blown = true;
+  $("hint").textContent = "Semoga permohonanmu terkabul! 🌠";
+  sfx.win(); burst(W / 2, H / 2, 160); confettiRain(2200);
+  setTimeout(() => go(3), 2300);
+}
+candles.forEach(c => c.addEventListener("click", () => {
+  if (lit < candles.length || c.classList.contains("out")) return;
+  c.classList.add("out"); sfx.pop(); checkAllOut();
+}));
+$("blowBtn").addEventListener("click", async () => {
+  for (const c of candles) { if (!c.classList.contains("out")) { c.classList.add("out"); sfx.pop(); await sleep(230); } }
+  checkAllOut();
+});
+$("micBtn").addEventListener("click", async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = actx.createAnalyser(); an.fftSize = 512;
+    actx.createMediaStreamSource(stream).connect(an);
+    const data = new Uint8Array(an.fftSize);
+    $("hint").textContent = "Sekarang tiup ke mikrofon... 🌬️";
+    let hits = 0;
+    (function loop() {
+      if (blown) { stream.getTracks().forEach(t => t.stop()); actx.close(); return; }
+      an.getByteTimeDomainData(data);
+      let sum = 0; for (const v of data) { const d = (v - 128) / 128; sum += d * d; }
+      hits = Math.sqrt(sum / data.length) > .12 ? hits + 1 : 0;
+      if (hits > 8) { candles.forEach(c => c.classList.add("out")); checkAllOut(); }
+      requestAnimationFrame(loop);
+    })();
+  } catch (err) {
+    $("hint").textContent = "Mikrofon tidak bisa diakses, klik apinya saja ya 🕯️";
+  }
+});
+
+/* ---------- 3: Kartu gosok ---------- */
+const sk = $("scratch"), sx = sk.getContext("2d");
+let scratching = false, scratched = false, moves = 0;
+$("revealText").textContent = fill(CONFIG.scratch);
+
+function paintScratch() {
+  sk.style.opacity = 1; sk.style.pointerEvents = "auto";
+  sx.globalCompositeOperation = "source-over";
+  const g = sx.createLinearGradient(0, 0, 320, 190);
+  g.addColorStop(0, "#c9c9d6"); g.addColorStop(.5, "#f2f2f7"); g.addColorStop(1, "#a9a9bb");
+  sx.fillStyle = g; sx.fillRect(0, 0, 320, 190);
+  sx.fillStyle = "#6b6b85"; sx.font = "bold 20px 'Segoe UI', sans-serif"; sx.textAlign = "center";
+  sx.fillText("✨ Gosok di sini ✨", 160, 102);
+}
+function scratchAt(e) {
+  const r = sk.getBoundingClientRect();
+  const x = (e.clientX - r.left) * sk.width / r.width, y = (e.clientY - r.top) * sk.height / r.height;
+  sx.globalCompositeOperation = "destination-out";
+  sx.beginPath(); sx.arc(x, y, 20, 0, 6.283); sx.fill();
+  if (++moves % 6 === 0) checkScratch();
+}
+function checkScratch() {
+  if (scratched) return;
+  const d = sx.getImageData(0, 0, 320, 190).data;
+  let clear = 0, total = 0;
+  for (let i = 3; i < d.length; i += 64) { total++; if (d[i] === 0) clear++; }
+  const pct = clear / total;
+  $("scratchPct").textContent = "Terbuka " + Math.min(100, Math.round(pct * 200)) + "%";
+  if (pct > .42) {
+    scratched = true; sk.style.opacity = 0; sk.style.pointerEvents = "none";
+    $("scratchPct").textContent = "udah tuek juga lau";
+    sfx.win(); burst(W / 2, H / 2, 120);
+    $("next3").classList.remove("hidden");
+  }
+}
+sk.addEventListener("pointerdown", (e) => { audio(); scratching = true; sk.setPointerCapture(e.pointerId); scratchAt(e); });
+sk.addEventListener("pointermove", (e) => { if (scratching) scratchAt(e); });
+sk.addEventListener("pointerup", () => { scratching = false; });
+sk.addEventListener("pointercancel", () => { scratching = false; });
+$("next3").addEventListener("click", () => go(4));
+paintScratch();
+
+/* ---------- 4: Buka kado ---------- */
+const giftEls = [...document.querySelectorAll(".g")];
+let openedGifts = 0;
+giftEls.forEach((g, i) => g.addEventListener("click", () => {
+  if (g.classList.contains("open") || g.dataset.busy) return;
+  g.dataset.busy = 1; g.classList.add("shake"); sfx.pop();
+  setTimeout(() => {
+    g.classList.remove("shake"); g.classList.add("open"); g.textContent = CONFIG.giftEmoji[i];
+    const r = g.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 60); sfx.win();
+    const w = document.createElement("div"); w.className = "wish"; w.textContent = CONFIG.wishes[i];
+    $("wishes").appendChild(w);
+    openedGifts++; $("giftCount").textContent = openedGifts;
+    if (openedGifts === giftEls.length) $("next4").classList.remove("hidden");
+  }, 600);
+}));
+$("next4").addEventListener("click", () => go(5));
+
+/* ---------- 5: Ucapan akhir ---------- */
+let finalRun = 0;
+hooks[5] = async () => {
+  const run = ++finalRun;
+  $("finalTitle").textContent = fill(CONFIG.title);
+  $("fromText").textContent = "";
+  const box = $("typed"); box.innerHTML = "";
+  confettiRain(4500); playSong();
+  for (let i = 0; i < 5; i++) setTimeout(() => launchFirework(rand(W * .15, W * .85), rand(H * .12, H * .45)), 500 + i * 650);
+  for (const line of CONFIG.messages) {
+    if (run !== finalRun) return;
+    const p = document.createElement("p"); p.textContent = fill(line); box.appendChild(p);
+    await sleep(1500);
+  }
+  if (run !== finalRun) return;
+  $("fromText").textContent = CONFIG.from;
+  heartShower();
+};
+$("s5").addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button")) return;
+  launchFirework(e.clientX, e.clientY); heart(e.clientX, e.clientY);
+});
+$("fireBtn").addEventListener("click", () => {
+  for (let i = 0; i < 4; i++) setTimeout(() => launchFirework(rand(W * .1, W * .9), rand(H * .1, H * .45)), i * 300);
+});
+$("loveBtn").addEventListener("click", heartShower);
+
+/* ---------- Ulangi ---------- */
+$("replayBtn").addEventListener("click", () => {
+  finalRun++; clearInterval(heartTimer);
+  document.querySelectorAll(".fall").forEach(e => e.remove());
+  candles.forEach(c => c.classList.remove("lit", "out"));
+  lit = 0; blown = false;
+  $("matchZone").classList.remove("hidden"); $("blowRow").classList.add("hidden");
+  $("hint").textContent = "0 / 3 lilin menyala";
+  scratched = false; moves = 0; paintScratch(); $("scratchPct").textContent = ""; $("next3").classList.add("hidden");
+  giftEls.forEach(g => { g.classList.remove("open", "shake"); g.textContent = "🎁"; delete g.dataset.busy; });
+  openedGifts = 0; $("giftCount").textContent = 0; $("wishes").innerHTML = ""; $("next4").classList.add("hidden");
+  go(1);
+});
+
+/* ============== Mulai ============== */
+updateDots();
+hooks[0]();
+</script>
+</body>
+</html>
